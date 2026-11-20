@@ -85,7 +85,7 @@ def test_login_success_returns_token():
     r = call("POST", "/login", json={"email": "eve.holt@reqres.in", "password": "cityslicka"})
     assert r.status_code == 200
     body = r.json()
-    assert set(body) == {"token"}
+    assert "token" in body  # ReqRes also adds extra fields (_meta, support), so do not require an exact key set
     assert isinstance(body["token"], str) and body["token"]
 
 
