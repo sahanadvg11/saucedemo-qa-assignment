@@ -19,7 +19,6 @@ Requirements: Python 3.10+ and Google Chrome (Selenium Manager downloads the mat
 
 ```bash
 pip install -r requirements.txt
-export REQRES_API_KEY=<your free key from https://app.reqres.in>   # needed for API tests only
 pytest
 ```
 
@@ -27,7 +26,7 @@ pytest
 - Watch the browser: `HEADED=1 pytest -m ui`
 - Failure screenshots are saved to `artifacts/`.
 
-> reqres.in now requires an `x-api-key` header on every request. Without `REQRES_API_KEY`, the API tests are skipped with a clear reason (they do not fail silently). In CI, add the key as a repository secret named `REQRES_API_KEY`.
+> The API tests use ReqRes's classic demo endpoints, which need no API key. POST/PUT/DELETE on them return realistic responses but do not persist data, so the tests assert on the response, not on stored state.
 
 ## What the UI tests cover (`tests/ui/test_saucedemo.py`)
 
@@ -58,7 +57,6 @@ pytest
 - **POST:** create user (201, echoed fields, `id`, `createdAt`), login (token), register (id and token).
 - **Invalid or missing data:** login without password / email, register without password, register with undefined user (all 400 with the exact `error` message).
 - **PUT / DELETE:** update (`updatedAt`), delete (204, empty body).
-- **Auth gate:** request without an API key is rejected (401/403).
 
 ## Bugs found
 
