@@ -56,7 +56,13 @@ if not (ROOT / ".git").exists():
 run("git", "add", "-A")
 run("git", "commit", "-q", "-m", "QA assignment: test plan, bugs, Selenium + API automation, CI", check=False)
 run("git", "branch", "-M", "main")
-run("gh", "repo", "create", slug, "--public", "--source", ".", "--remote", "origin", "--push")
+if subprocess.run(["gh", "repo", "view", slug], capture_output=True).returncode == 0:
+    print("  repo already exists - pushing to it")
+    if "origin" not in run("git", "remote", capture=True).split():
+        run("git", "remote", "add", "origin", f"https://github.com/{slug}.git")
+    run("git", "push", "-u", "origin", "main")
+else:
+    run("gh", "repo", "create", slug, "--public", "--source", ".", "--remote", "origin", "--push")
 
 # 4. secret
 print("[4/6] ReqRes API key secret ...")
@@ -73,16 +79,24 @@ run("gh", "auth", "refresh", "-s", "project")  # may open a browser once
 run("gh", "label", "create", "bug", "--repo", slug, "--color", "d73a4a", "--force", capture=True)
 for s in ("critical", "major", "minor"):
     run("gh", "label", "create", f"severity: {s}", "--repo", slug, "--force", capture=True)
-num = run("gh", "project", "create", "--owner", owner, "--title", "SauceDemo QA Board",
-          "--format", "json", "--jq", ".number", capture=True)
-run("gh", "project", "link", num, "--owner", owner, "--repo", slug)
+num = run("gh", "project", "list", "--owner", owner, "--format", "json", "--jq",
+          '.projects[] | select(.title=="SauceDemo QA Board") | .number', capture=True).split("\n")[0]
+if not num:
+    num = run("gh", "project", "create", "--owner", owner, "--title", "SauceDemo QA Board",
+              "--format", "json", "--jq", ".number", capture=True)
+run("gh", "project", "link", num, "--owner", owner, "--repo", slug, check=False)
 
 # 6. issues
 print("[6/6] Creating issues ...")
+existing = set(run("gh", "issue", "list", "--repo", slug, "--state", "all", "--limit", "100",
+                   "--json", "title", "--jq", ".[].title", capture=True).splitlines())
 for f in sorted((ROOT / "docs" / "bug-reports").glob("BUG-*.md")):
     text = f.read_text(encoding="utf-8").replace("__OWNER__", owner).replace("__REPO__", repo_name)
     lines = text.splitlines()
     title = f"{f.stem}: " + re.sub(r"^# BUG-\d+: ", "", lines[0])
+    if title in existing:
+        print("   already exists, skipping:", title)
+        continue
     sev = re.search(r"\| Severity \| (\w+)", text).group(1).lower()
     body = ROOT / "artifacts" / f"{f.stem}.body.md"
     body.parent.mkdir(exist_ok=True)
